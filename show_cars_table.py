@@ -120,7 +120,8 @@ mileage_col = get_first_existing_column(df, ["ai_mileage_km", "original_mileage_
 score_col = get_first_existing_column(df, ["ai_total_score_0_to_100"])
 recommendation_col = get_first_existing_column(df, ["ai_recommendation"])
 car_name_col = get_first_existing_column(df, ["ai_car_name", "original_title", "title"])
-
+horsepower_col = get_first_existing_column(df, ["ai_horsepower_hp", "horsepower_hp"])
+doors_col = get_first_existing_column(df, ["ai_doors", "doors"])
 
 # -----------------------------
 # Sort by score
@@ -331,6 +332,8 @@ default_columns = [
     "ai_mileage_km",
     "original_fuel",
     "original_transmission",
+    "ai_horsepower_hp",
+    "ai_doors",
 
     "ai_critair",
     "ai_reliability_score_0_to_25",
@@ -467,14 +470,16 @@ if len(filtered_df) > 0:
 
     st.markdown(f"### {car.get(car_name_col, 'Unknown car') if car_name_col else 'Unknown car'}")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 
     c1.metric("Score", car.get(score_col, "-") if score_col else "-")
     c2.metric("Recommendation", car.get(recommendation_col, "-") if recommendation_col else "-")
     c3.metric("Price", f"{car.get(price_col, '-')} €" if price_col else "-")
     c4.metric("Year", car.get(year_col, "-") if year_col else "-")
     c5.metric("Mileage", f"{car.get(mileage_col, '-')} km" if mileage_col else "-")
-
+    c6.metric("Horsepower", car.get(horsepower_col, "-") if horsepower_col else "-")
+    c7.metric("Doors", car.get(doors_col, "-") if doors_col else "-")
+    
     st.write("**Fuel:**")
     st.write(car.get(fuel_col, "-") if fuel_col else "-")
 
