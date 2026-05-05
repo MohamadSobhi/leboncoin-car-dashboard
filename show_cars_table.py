@@ -34,6 +34,8 @@ def load_data(csv_file):
         "ai_mileage_km",
         "ai_critair",
         "ai_confidence_0_to_1",
+        "ai_horsepower_hp",
+        "ai_doors",
         "original_year",
         "original_price_eur",
         "original_mileage_km",
