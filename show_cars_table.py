@@ -1,9 +1,11 @@
 import html
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 CSV_FILE = "leboncoin_combined_results.csv"
+
 
 st.set_page_config(
     page_title="Leboncoin Car Ranking",
@@ -55,6 +57,7 @@ def load_data(csv_file):
 def format_number(value):
     if pd.isna(value):
         return "-"
+
     try:
         return f"{int(value):,}".replace(",", " ")
     except Exception:
@@ -64,6 +67,7 @@ def format_number(value):
 def format_price(value):
     if pd.isna(value):
         return "-"
+
     try:
         return f"{int(value):,} €".replace(",", " ")
     except Exception:
@@ -73,6 +77,7 @@ def format_price(value):
 def format_score(value):
     if pd.isna(value):
         return "-"
+
     try:
         return str(int(value))
     except Exception:
@@ -155,9 +160,19 @@ def build_html_table(df):
             lambda x: "-" if pd.isna(x) else f"{int(x):,} km".replace(",", " ")
         )
 
-    for col in ["Score", "Year", "HP", "Doors", "Crit’Air",
-                "Price score", "HP score", "Year score",
-                "Mileage score", "Location score", "Seller score"]:
+    for col in [
+        "Score",
+        "Year",
+        "HP",
+        "Doors",
+        "Crit’Air",
+        "Price score",
+        "HP score",
+        "Year score",
+        "Mileage score",
+        "Location score",
+        "Seller score",
+    ]:
         if col in display_df.columns:
             display_df[col] = display_df[col].apply(format_score)
 
@@ -169,34 +184,52 @@ def build_html_table(df):
 
     css = """
     <style>
+    body {
+        background-color: #0e1117;
+        color: #fafafa;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+    }
+
     .car-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 14px;
+        color: #fafafa;
     }
 
     .car-table th {
-        background-color: #f2f2f2;
-        padding: 8px;
-        border-bottom: 2px solid #ddd;
+        background-color: #262730;
+        color: #fafafa;
+        padding: 10px;
+        border-bottom: 2px solid #444;
         text-align: left;
         position: sticky;
         top: 0;
         z-index: 1;
+        white-space: nowrap;
     }
 
     .car-table td {
-        padding: 8px;
-        border-bottom: 1px solid #ddd;
+        padding: 9px;
+        border-bottom: 1px solid #333;
         vertical-align: top;
+        white-space: nowrap;
     }
 
     .car-table tr:hover {
-        background-color: #f9f9f9;
+        background-color: #1f2430;
     }
 
     .car-table a {
-        color: #1f77b4;
+        color: #4da3ff;
         font-weight: 600;
         text-decoration: none;
     }
@@ -207,9 +240,16 @@ def build_html_table(df):
     </style>
     """
 
-    return css + html_table
+    return css + f"""
+    <div class="table-container">
+        {html_table}
+    </div>
+    """
 
 
+# -----------------------------
+# Read CSV
+# -----------------------------
 try:
     df = load_data(CSV_FILE)
 except FileNotFoundError:
@@ -224,6 +264,7 @@ st.sidebar.header("Filters")
 
 search_text = st.sidebar.text_input("Search car / city / fuel / seller")
 
+
 if "fuel" in df.columns:
     fuel_options = sorted(df["fuel"].dropna().astype(str).unique().tolist())
 else:
@@ -234,6 +275,7 @@ selected_fuels = st.sidebar.multiselect(
     fuel_options,
     default=fuel_options
 )
+
 
 if "transmission" in df.columns:
     transmission_options = sorted(df["transmission"].dropna().astype(str).unique().tolist())
@@ -246,6 +288,7 @@ selected_transmissions = st.sidebar.multiselect(
     default=transmission_options
 )
 
+
 if "seller_type" in df.columns:
     seller_options = sorted(df["seller_type"].dropna().astype(str).unique().tolist())
 else:
@@ -256,6 +299,7 @@ selected_sellers = st.sidebar.multiselect(
     seller_options,
     default=seller_options
 )
+
 
 if "recommendation_score" in df.columns:
     min_score = int(df["recommendation_score"].fillna(0).min())
@@ -270,6 +314,7 @@ if "recommendation_score" in df.columns:
 else:
     score_range = (0, 100)
 
+
 if "price_eur" in df.columns:
     min_price = int(df["price_eur"].fillna(0).min())
     max_price = int(df["price_eur"].fillna(10000).max())
@@ -282,6 +327,7 @@ if "price_eur" in df.columns:
     )
 else:
     price_range = (0, 999999)
+
 
 if "year" in df.columns:
     min_year = int(df["year"].fillna(2000).min())
@@ -296,6 +342,7 @@ if "year" in df.columns:
 else:
     year_range = (1900, 2100)
 
+
 if "mileage_km" in df.columns:
     min_mileage = int(df["mileage_km"].fillna(0).min())
     max_mileage = int(df["mileage_km"].fillna(300000).max())
@@ -308,6 +355,7 @@ if "mileage_km" in df.columns:
     )
 else:
     mileage_range = (0, 999999)
+
 
 if "horsepower" in df.columns:
     min_hp = int(df["horsepower"].fillna(0).min())
@@ -351,40 +399,48 @@ if search_text:
 
     filtered_df = filtered_df[mask]
 
+
 if selected_fuels and "fuel" in filtered_df.columns:
     filtered_df = filtered_df[
         filtered_df["fuel"].astype(str).isin(selected_fuels)
     ]
+
 
 if selected_transmissions and "transmission" in filtered_df.columns:
     filtered_df = filtered_df[
         filtered_df["transmission"].astype(str).isin(selected_transmissions)
     ]
 
+
 if selected_sellers and "seller_type" in filtered_df.columns:
     filtered_df = filtered_df[
         filtered_df["seller_type"].astype(str).isin(selected_sellers)
     ]
+
 
 if "recommendation_score" in filtered_df.columns:
     filtered_df = filtered_df[
         filtered_df["recommendation_score"].between(score_range[0], score_range[1])
     ]
 
+
 if "price_eur" in filtered_df.columns:
     filtered_df = filtered_df[
         filtered_df["price_eur"].between(price_range[0], price_range[1])
     ]
+
 
 if "year" in filtered_df.columns:
     filtered_df = filtered_df[
         filtered_df["year"].between(year_range[0], year_range[1])
     ]
 
+
 if "mileage_km" in filtered_df.columns:
     filtered_df = filtered_df[
         filtered_df["mileage_km"].between(mileage_range[0], mileage_range[1])
     ]
+
 
 if "horsepower" in filtered_df.columns:
     filtered_df = filtered_df[
@@ -437,7 +493,7 @@ if len(filtered_df) == 0:
     st.warning("No cars match your filters.")
 else:
     html_table = build_html_table(filtered_df)
-    st.markdown(html_table, unsafe_allow_html=True)
+    components.html(html_table, height=700, scrolling=True)
 
 
 # -----------------------------
