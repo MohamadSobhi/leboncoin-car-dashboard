@@ -194,12 +194,16 @@ def build_html_table(df):
 
     .table-container {
         width: 100%;
-        overflow-x: auto;
-        overflow-y: auto;
+        height: 680px;
+        overflow: auto;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background-color: #0e1117;
     }
 
     .car-table {
-        width: 100%;
+        width: max-content;
+        min-width: 100%;
         border-collapse: collapse;
         font-size: 14px;
         color: #fafafa;
@@ -213,7 +217,7 @@ def build_html_table(df):
         text-align: left;
         position: sticky;
         top: 0;
-        z-index: 1;
+        z-index: 10;
         white-space: nowrap;
     }
 
@@ -493,7 +497,7 @@ if len(filtered_df) == 0:
     st.warning("No cars match your filters.")
 else:
     html_table = build_html_table(filtered_df)
-    components.html(html_table, height=700, scrolling=True)
+    components.html(html_table, height=720, scrolling=False)
 
 
 # -----------------------------
