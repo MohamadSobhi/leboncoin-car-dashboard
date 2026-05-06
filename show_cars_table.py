@@ -55,10 +55,12 @@ def display_name(col):
 
     Examples:
     ai_car_name -> car_name
-    ai_total_score_0_to_100 -> total_score_0_to_100
+    ai_location -> location
+    ai_horsepower_hp -> horsepower_hp
     original_year -> year
     original_fuel -> fuel
     original_transmission -> transmission
+    original_seller_type -> seller_type
     open_ad -> url
     """
     if col == "open_ad":
@@ -111,17 +113,38 @@ except FileNotFoundError:
 # -----------------------------
 year_col = get_first_existing_column(df, ["original_year", "ai_year", "year"])
 fuel_col = get_first_existing_column(df, ["original_fuel", "ai_fuel_type", "fuel"])
+
 transmission_col = get_first_existing_column(
     df,
     ["original_transmission", "ai_transmission", "transmission"]
 )
-price_col = get_first_existing_column(df, ["ai_price_eur", "original_price_eur", "price_eur"])
-mileage_col = get_first_existing_column(df, ["ai_mileage_km", "original_mileage_km", "mileage_km"])
+
+seller_type_col = get_first_existing_column(
+    df,
+    ["original_seller_type", "ai_seller_type", "seller_type"]
+)
+
+location_col = get_first_existing_column(
+    df,
+    ["ai_location", "original_location", "detail_location", "location"]
+)
+
+price_col = get_first_existing_column(
+    df,
+    ["ai_price_eur", "original_price_eur", "price_eur"]
+)
+
+mileage_col = get_first_existing_column(
+    df,
+    ["ai_mileage_km", "original_mileage_km", "mileage_km"]
+)
+
 score_col = get_first_existing_column(df, ["ai_total_score_0_to_100"])
 recommendation_col = get_first_existing_column(df, ["ai_recommendation"])
 car_name_col = get_first_existing_column(df, ["ai_car_name", "original_title", "title"])
 horsepower_col = get_first_existing_column(df, ["ai_horsepower_hp", "horsepower_hp"])
 doors_col = get_first_existing_column(df, ["ai_doors", "doors"])
+
 
 # -----------------------------
 # Sort by score
@@ -146,7 +169,7 @@ elif "original_url" in df.columns:
 # -----------------------------
 st.sidebar.header("Filters")
 
-search_text = st.sidebar.text_input("Search car name / brand / model")
+search_text = st.sidebar.text_input("Search car name / brand / model / city")
 
 if recommendation_col:
     recommendations = sorted(df[recommendation_col].dropna().unique().tolist())
@@ -168,6 +191,17 @@ selected_fuels = st.sidebar.multiselect(
     "Fuel type",
     fuel_options,
     default=fuel_options
+)
+
+if seller_type_col:
+    seller_options = sorted(df[seller_type_col].dropna().astype(str).unique().tolist())
+else:
+    seller_options = []
+
+selected_seller_types = st.sidebar.multiselect(
+    "Seller type",
+    seller_options,
+    default=seller_options
 )
 
 if score_col:
@@ -228,6 +262,22 @@ if mileage_col:
 else:
     mileage_range = (0, 999999)
 
+# New horsepower filter
+if horsepower_col:
+    df[horsepower_col] = pd.to_numeric(df[horsepower_col], errors="coerce")
+
+    min_hp_value = int(df[horsepower_col].fillna(0).min())
+    max_hp_value = int(df[horsepower_col].fillna(300).max())
+
+    horsepower_range = st.sidebar.slider(
+        "Horsepower hp",
+        min_value=0,
+        max_value=max(50, max_hp_value),
+        value=(min_hp_value, max_hp_value)
+    )
+else:
+    horsepower_range = (0, 999999)
+
 
 # -----------------------------
 # Apply filters
@@ -241,7 +291,11 @@ if search_text:
         "ai_model",
         "original_title",
         "title",
-        "ai_short_reason"
+        "ai_short_reason",
+        "ai_location",
+        "original_location",
+        "detail_location",
+        "location"
     ]
 
     existing_search_cols = [col for col in search_cols if col in filtered_df.columns]
@@ -268,6 +322,11 @@ if selected_fuels and fuel_col:
         filtered_df[fuel_col].astype(str).isin(selected_fuels)
     ]
 
+if selected_seller_types and seller_type_col:
+    filtered_df = filtered_df[
+        filtered_df[seller_type_col].astype(str).isin(selected_seller_types)
+    ]
+
 if score_col:
     filtered_df = filtered_df[
         filtered_df[score_col].between(score_range[0], score_range[1])
@@ -289,11 +348,17 @@ if mileage_col:
         filtered_df[mileage_col].between(mileage_range[0], mileage_range[1])
     ]
 
+if horsepower_col:
+    filtered_df[horsepower_col] = pd.to_numeric(filtered_df[horsepower_col], errors="coerce")
+    filtered_df = filtered_df[
+        filtered_df[horsepower_col].between(horsepower_range[0], horsepower_range[1])
+    ]
+
 
 # -----------------------------
 # Summary metrics
 # -----------------------------
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 
 col1.metric("Cars shown", len(filtered_df))
 
@@ -317,6 +382,11 @@ if mileage_col and len(filtered_df) > 0:
 else:
     col5.metric("Lowest mileage", "-")
 
+if horsepower_col and len(filtered_df) > 0:
+    col6.metric("Max horsepower", int(filtered_df[horsepower_col].max()))
+else:
+    col6.metric("Max horsepower", "-")
+
 
 # -----------------------------
 # Default columns to display
@@ -327,15 +397,20 @@ default_columns = [
     "ai_recommendation",
     "ai_price_eur",
 
-    # Use original values here
+    # Use original values where preferred
     "original_year",
     "ai_mileage_km",
     "original_fuel",
     "original_transmission",
+    "original_seller_type",
+
+    # AI extracted/evaluated values
+    "ai_location",
     "ai_horsepower_hp",
     "ai_doors",
-
     "ai_critair",
+
+    # Scores
     "ai_reliability_score_0_to_25",
     "ai_buyer_suitability_score_0_to_20",
     "ai_price_value_score_0_to_15",
@@ -343,8 +418,12 @@ default_columns = [
     "ai_running_cost_score_0_to_10",
     "ai_resale_ease_score_1_to_5",
     "ai_spare_parts_availability_score_1_to_10",
+
+    # Explanation
     "ai_short_reason",
     "ai_questions_to_ask_seller",
+
+    # URL last
     "open_ad"
 ]
 
@@ -468,7 +547,9 @@ if len(filtered_df) > 0:
 
     car = filtered_df.loc[selected_index]
 
-    st.markdown(f"### {car.get(car_name_col, 'Unknown car') if car_name_col else 'Unknown car'}")
+    st.markdown(
+        f"### {car.get(car_name_col, 'Unknown car') if car_name_col else 'Unknown car'}"
+    )
 
     c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 
@@ -479,12 +560,18 @@ if len(filtered_df) > 0:
     c5.metric("Mileage", f"{car.get(mileage_col, '-')} km" if mileage_col else "-")
     c6.metric("Horsepower", car.get(horsepower_col, "-") if horsepower_col else "-")
     c7.metric("Doors", car.get(doors_col, "-") if doors_col else "-")
-    
+
     st.write("**Fuel:**")
     st.write(car.get(fuel_col, "-") if fuel_col else "-")
 
     st.write("**Transmission:**")
     st.write(car.get(transmission_col, "-") if transmission_col else "-")
+
+    st.write("**Seller type:**")
+    st.write(car.get(seller_type_col, "-") if seller_type_col else "-")
+
+    st.write("**Location:**")
+    st.write(car.get(location_col, "-") if location_col else "-")
 
     st.write("**Reason:**")
     st.write(car.get("ai_short_reason", ""))
