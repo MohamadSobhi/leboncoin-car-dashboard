@@ -46,8 +46,8 @@ def load_data(csv_file):
 
     if "recommendation_score" in df.columns:
         df = df.sort_values(
-            by=["recommendation_score", "price_score", "year", "mileage_km"],
-            ascending=[False, False, False, True],
+            by=["recommendation_score", "price_eur", "year", "mileage_km"],
+            ascending=[False, True, False, True],
             na_position="last"
         )
 
@@ -94,7 +94,7 @@ def make_clickable_car_name(name, url):
         return name
 
     url = html.escape(str(url))
-    return f'<a href="{url}" target="_blank">{name}</a>'
+    return f'<a href="{url}" target="_blank" title="{name}">{name}</a>'
 
 
 def build_html_table(df):
@@ -109,14 +109,7 @@ def build_html_table(df):
         "seller_type",
         "location",
         "horsepower",
-        "doors",
         "critair_estimated",
-        "price_score",
-        "horsepower_score",
-        "year_score",
-        "mileage_score",
-        "location_score",
-        "seller_score",
     ]
 
     table_cols = [c for c in table_cols if c in df.columns]
@@ -140,14 +133,7 @@ def build_html_table(df):
         "seller_type": "Seller",
         "location": "Location",
         "horsepower": "HP",
-        "doors": "Doors",
         "critair_estimated": "Crit’Air",
-        "price_score": "Price score",
-        "horsepower_score": "HP score",
-        "year_score": "Year score",
-        "mileage_score": "Mileage score",
-        "location_score": "Location score",
-        "seller_score": "Seller score",
     }
 
     display_df = display_df.rename(columns=rename_cols)
@@ -160,19 +146,7 @@ def build_html_table(df):
             lambda x: "-" if pd.isna(x) else f"{int(x):,} km".replace(",", " ")
         )
 
-    for col in [
-        "Score",
-        "Year",
-        "HP",
-        "Doors",
-        "Crit’Air",
-        "Price score",
-        "HP score",
-        "Year score",
-        "Mileage score",
-        "Location score",
-        "Seller score",
-    ]:
+    for col in ["Score", "Year", "HP", "Crit’Air"]:
         if col in display_df.columns:
             display_df[col] = display_df[col].apply(format_score)
 
@@ -207,6 +181,7 @@ def build_html_table(df):
         border-collapse: collapse;
         font-size: 14px;
         color: #fafafa;
+        table-layout: fixed;
     }
 
     .car-table th {
@@ -226,6 +201,78 @@ def build_html_table(df):
         border-bottom: 1px solid #333;
         vertical-align: top;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .car-table th:nth-child(1),
+    .car-table td:nth-child(1) {
+        width: 360px;
+        max-width: 360px;
+        min-width: 360px;
+    }
+
+    .car-table th:nth-child(2),
+    .car-table td:nth-child(2) {
+        width: 70px;
+        max-width: 70px;
+        text-align: center;
+    }
+
+    .car-table th:nth-child(3),
+    .car-table td:nth-child(3) {
+        width: 100px;
+        max-width: 100px;
+    }
+
+    .car-table th:nth-child(4),
+    .car-table td:nth-child(4) {
+        width: 80px;
+        max-width: 80px;
+    }
+
+    .car-table th:nth-child(5),
+    .car-table td:nth-child(5) {
+        width: 120px;
+        max-width: 120px;
+    }
+
+    .car-table th:nth-child(6),
+    .car-table td:nth-child(6) {
+        width: 100px;
+        max-width: 100px;
+    }
+
+    .car-table th:nth-child(7),
+    .car-table td:nth-child(7) {
+        width: 120px;
+        max-width: 120px;
+    }
+
+    .car-table th:nth-child(8),
+    .car-table td:nth-child(8) {
+        width: 140px;
+        max-width: 140px;
+    }
+
+    .car-table th:nth-child(9),
+    .car-table td:nth-child(9) {
+        width: 260px;
+        max-width: 260px;
+    }
+
+    .car-table th:nth-child(10),
+    .car-table td:nth-child(10) {
+        width: 70px;
+        max-width: 70px;
+        text-align: center;
+    }
+
+    .car-table th:nth-child(11),
+    .car-table td:nth-child(11) {
+        width: 80px;
+        max-width: 80px;
+        text-align: center;
     }
 
     .car-table tr:hover {
@@ -236,6 +283,12 @@ def build_html_table(df):
         color: #4da3ff;
         font-weight: 600;
         text-decoration: none;
+        display: inline-block;
+        max-width: 350px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: bottom;
     }
 
     .car-table a:hover {
@@ -542,15 +595,14 @@ if len(filtered_df) > 0:
     else:
         st.markdown(f"### {car_title}")
 
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     c1.metric("Score", format_score(car.get("recommendation_score", "-")))
     c2.metric("Price", format_price(car.get("price_eur", "-")))
     c3.metric("Year", format_score(car.get("year", "-")))
     c4.metric("Mileage", f"{format_number(car.get('mileage_km', '-'))} km")
     c5.metric("Horsepower", format_score(car.get("horsepower", "-")))
-    c6.metric("Doors", format_score(car.get("doors", "-")))
-    c7.metric("Crit’Air", format_score(car.get("critair_estimated", "-")))
+    c6.metric("Crit’Air", format_score(car.get("critair_estimated", "-")))
 
     st.write("**Fuel:**")
     st.write(car.get("fuel", "-"))
@@ -568,6 +620,7 @@ if len(filtered_df) > 0:
         st.link_button("Open Leboncoin ad", car_url)
 
     with st.expander("Score details"):
+        st.write(f"Recommendation score: {format_score(car.get('recommendation_score', '-'))}")
         st.write(f"Price score: {format_score(car.get('price_score', '-'))}")
         st.write(f"Horsepower score: {format_score(car.get('horsepower_score', '-'))}")
         st.write(f"Year score: {format_score(car.get('year_score', '-'))}")
