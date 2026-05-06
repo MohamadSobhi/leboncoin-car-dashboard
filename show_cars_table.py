@@ -1,7 +1,9 @@
+import html
 import pandas as pd
 import streamlit as st
 
-CSV_FILE = "leboncoin_cars_ranked_comprehensive.csv"
+
+CSV_FILE = "leboncoin_combined_results.csv"
 
 st.set_page_config(
     page_title="Leboncoin Car Ranking",
@@ -10,7 +12,7 @@ st.set_page_config(
 )
 
 st.title("🚗 Leboncoin Car Decision Table")
-st.caption("Used-car ranking and decision support for France")
+st.caption("Ranked used-car results from Leboncoin")
 
 
 # -----------------------------
@@ -21,84 +23,191 @@ def load_data(csv_file):
     df = pd.read_csv(csv_file)
 
     numeric_cols = [
-        "ai_total_score_0_to_100",
-        "ai_reliability_score_0_to_25",
-        "ai_buyer_suitability_score_0_to_20",
-        "ai_price_value_score_0_to_15",
-        "ai_zfe_critair_score_0_to_10",
-        "ai_running_cost_score_0_to_10",
-        "ai_resale_score_0_to_10",
-        "ai_parts_score_0_to_10",
-        "ai_price_eur",
-        "ai_year",
-        "ai_mileage_km",
-        "ai_critair",
-        "ai_confidence_0_to_1",
-        "ai_horsepower_hp",
-        "ai_doors",
-        "original_year",
-        "original_price_eur",
-        "original_mileage_km",
+        "recommendation_score",
+        "price_score",
+        "horsepower_score",
+        "year_score",
+        "mileage_score",
+        "location_score",
+        "seller_score",
+        "price_eur",
+        "year",
+        "mileage_km",
+        "horsepower",
+        "doors",
+        "critair_estimated",
     ]
 
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
+    if "recommendation_score" in df.columns:
+        df = df.sort_values(
+            by=["recommendation_score", "price_score", "year", "mileage_km"],
+            ascending=[False, False, False, True],
+            na_position="last"
+        )
+
     return df
 
 
-def display_name(col):
+def format_number(value):
+    if pd.isna(value):
+        return "-"
+    try:
+        return f"{int(value):,}".replace(",", " ")
+    except Exception:
+        return str(value)
+
+
+def format_price(value):
+    if pd.isna(value):
+        return "-"
+    try:
+        return f"{int(value):,} €".replace(",", " ")
+    except Exception:
+        return str(value)
+
+
+def format_score(value):
+    if pd.isna(value):
+        return "-"
+    try:
+        return str(int(value))
+    except Exception:
+        return str(value)
+
+
+def make_clickable_car_name(name, url):
+    if pd.isna(name):
+        name = "Unknown car"
+
+    name = html.escape(str(name))
+
+    if pd.isna(url) or str(url).strip() == "":
+        return name
+
+    url = html.escape(str(url))
+    return f'<a href="{url}" target="_blank">{name}</a>'
+
+
+def build_html_table(df):
+    table_cols = [
+        "car_name",
+        "recommendation_score",
+        "price_eur",
+        "year",
+        "mileage_km",
+        "fuel",
+        "transmission",
+        "seller_type",
+        "location",
+        "horsepower",
+        "doors",
+        "critair_estimated",
+        "price_score",
+        "horsepower_score",
+        "year_score",
+        "mileage_score",
+        "location_score",
+        "seller_score",
+    ]
+
+    table_cols = [c for c in table_cols if c in df.columns]
+
+    display_df = df[table_cols].copy()
+
+    if "car_name" in display_df.columns and "url" in df.columns:
+        display_df["car_name"] = [
+            make_clickable_car_name(name, url)
+            for name, url in zip(df["car_name"], df["url"])
+        ]
+
+    rename_cols = {
+        "car_name": "Car name",
+        "recommendation_score": "Score",
+        "price_eur": "Price",
+        "year": "Year",
+        "mileage_km": "Mileage",
+        "fuel": "Fuel",
+        "transmission": "Transmission",
+        "seller_type": "Seller",
+        "location": "Location",
+        "horsepower": "HP",
+        "doors": "Doors",
+        "critair_estimated": "Crit’Air",
+        "price_score": "Price score",
+        "horsepower_score": "HP score",
+        "year_score": "Year score",
+        "mileage_score": "Mileage score",
+        "location_score": "Location score",
+        "seller_score": "Seller score",
+    }
+
+    display_df = display_df.rename(columns=rename_cols)
+
+    if "Price" in display_df.columns:
+        display_df["Price"] = display_df["Price"].apply(format_price)
+
+    if "Mileage" in display_df.columns:
+        display_df["Mileage"] = display_df["Mileage"].apply(
+            lambda x: "-" if pd.isna(x) else f"{int(x):,} km".replace(",", " ")
+        )
+
+    for col in ["Score", "Year", "HP", "Doors", "Crit’Air",
+                "Price score", "HP score", "Year score",
+                "Mileage score", "Location score", "Seller score"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(format_score)
+
+    html_table = display_df.to_html(
+        escape=False,
+        index=False,
+        classes="car-table"
+    )
+
+    css = """
+    <style>
+    .car-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .car-table th {
+        background-color: #f2f2f2;
+        padding: 8px;
+        border-bottom: 2px solid #ddd;
+        text-align: left;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .car-table td {
+        padding: 8px;
+        border-bottom: 1px solid #ddd;
+        vertical-align: top;
+    }
+
+    .car-table tr:hover {
+        background-color: #f9f9f9;
+    }
+
+    .car-table a {
+        color: #1f77b4;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .car-table a:hover {
+        text-decoration: underline;
+    }
+    </style>
     """
-    Clean column names only for display.
-    Internal CSV column names stay unchanged.
 
-    Examples:
-    ai_car_name -> car_name
-    ai_location -> location
-    ai_horsepower_hp -> horsepower_hp
-    original_year -> year
-    original_fuel -> fuel
-    original_transmission -> transmission
-    original_seller_type -> seller_type
-    open_ad -> url
-    """
-    if col == "open_ad":
-        return "url"
-
-    clean = col
-
-    if clean.startswith("ai_"):
-        clean = clean[3:]
-
-    if clean.startswith("original_"):
-        clean = clean[9:]
-
-    return clean
-
-
-def put_url_last(columns):
-    """
-    Put URL/open-ad column at the end.
-    """
-    url_cols = [c for c in ["open_ad", "source_url", "url"] if c in columns]
-    normal_cols = [c for c in columns if c not in url_cols]
-
-    if "open_ad" in url_cols:
-        return normal_cols + ["open_ad"]
-    elif "source_url" in url_cols:
-        return normal_cols + ["source_url"]
-    elif "url" in url_cols:
-        return normal_cols + ["url"]
-
-    return normal_cols
-
-
-def get_first_existing_column(df, possible_columns):
-    for col in possible_columns:
-        if col in df.columns:
-            return col
-    return None
+    return css + html_table
 
 
 try:
@@ -109,81 +218,14 @@ except FileNotFoundError:
 
 
 # -----------------------------
-# Choose preferred source columns
-# -----------------------------
-year_col = get_first_existing_column(df, ["original_year", "ai_year", "year"])
-fuel_col = get_first_existing_column(df, ["original_fuel", "ai_fuel_type", "fuel"])
-
-transmission_col = get_first_existing_column(
-    df,
-    ["original_transmission", "ai_transmission", "transmission"]
-)
-
-seller_type_col = get_first_existing_column(
-    df,
-    ["original_seller_type", "ai_seller_type", "seller_type"]
-)
-
-location_col = get_first_existing_column(
-    df,
-    ["ai_location", "original_location", "detail_location", "location"]
-)
-
-price_col = get_first_existing_column(
-    df,
-    ["ai_price_eur", "original_price_eur", "price_eur"]
-)
-
-mileage_col = get_first_existing_column(
-    df,
-    ["ai_mileage_km", "original_mileage_km", "mileage_km"]
-)
-
-score_col = get_first_existing_column(df, ["ai_total_score_0_to_100"])
-recommendation_col = get_first_existing_column(df, ["ai_recommendation"])
-car_name_col = get_first_existing_column(df, ["ai_car_name", "original_title", "title"])
-horsepower_col = get_first_existing_column(df, ["ai_horsepower_hp", "horsepower_hp"])
-doors_col = get_first_existing_column(df, ["ai_doors", "doors"])
-
-
-# -----------------------------
-# Sort by score
-# -----------------------------
-if score_col:
-    df = df.sort_values(score_col, ascending=False)
-
-
-# -----------------------------
-# Add clickable URL column
-# -----------------------------
-if "source_url" in df.columns:
-    df["open_ad"] = df["source_url"]
-elif "url" in df.columns:
-    df["open_ad"] = df["url"]
-elif "original_url" in df.columns:
-    df["open_ad"] = df["original_url"]
-
-
-# -----------------------------
 # Sidebar filters
 # -----------------------------
 st.sidebar.header("Filters")
 
-search_text = st.sidebar.text_input("Search car name / brand / model / city")
+search_text = st.sidebar.text_input("Search car / city / fuel / seller")
 
-if recommendation_col:
-    recommendations = sorted(df[recommendation_col].dropna().unique().tolist())
-else:
-    recommendations = []
-
-selected_recommendations = st.sidebar.multiselect(
-    "Recommendation",
-    recommendations,
-    default=recommendations
-)
-
-if fuel_col:
-    fuel_options = sorted(df[fuel_col].dropna().astype(str).unique().tolist())
+if "fuel" in df.columns:
+    fuel_options = sorted(df["fuel"].dropna().astype(str).unique().tolist())
 else:
     fuel_options = []
 
@@ -193,87 +235,89 @@ selected_fuels = st.sidebar.multiselect(
     default=fuel_options
 )
 
-if seller_type_col:
-    seller_options = sorted(df[seller_type_col].dropna().astype(str).unique().tolist())
+if "transmission" in df.columns:
+    transmission_options = sorted(df["transmission"].dropna().astype(str).unique().tolist())
+else:
+    transmission_options = []
+
+selected_transmissions = st.sidebar.multiselect(
+    "Transmission",
+    transmission_options,
+    default=transmission_options
+)
+
+if "seller_type" in df.columns:
+    seller_options = sorted(df["seller_type"].dropna().astype(str).unique().tolist())
 else:
     seller_options = []
 
-selected_seller_types = st.sidebar.multiselect(
+selected_sellers = st.sidebar.multiselect(
     "Seller type",
     seller_options,
     default=seller_options
 )
 
-if score_col:
+if "recommendation_score" in df.columns:
+    min_score = int(df["recommendation_score"].fillna(0).min())
+    max_score = int(df["recommendation_score"].fillna(100).max())
+
     score_range = st.sidebar.slider(
-        "Total score",
+        "Recommendation score",
         min_value=0,
         max_value=100,
-        value=(
-            int(df[score_col].fillna(0).min()),
-            int(df[score_col].fillna(100).max())
-        )
+        value=(min_score, max_score)
     )
 else:
     score_range = (0, 100)
 
-if price_col:
-    max_price_value = int(df[price_col].fillna(10000).max())
+if "price_eur" in df.columns:
+    min_price = int(df["price_eur"].fillna(0).min())
+    max_price = int(df["price_eur"].fillna(10000).max())
 
     price_range = st.sidebar.slider(
         "Price (€)",
         min_value=0,
-        max_value=max(1000, max_price_value),
-        value=(
-            int(df[price_col].fillna(0).min()),
-            max_price_value
-        )
+        max_value=max(1000, max_price),
+        value=(min_price, max_price)
     )
 else:
     price_range = (0, 999999)
 
-if year_col:
-    df[year_col] = pd.to_numeric(df[year_col], errors="coerce")
-
-    min_year_value = int(df[year_col].fillna(2000).min())
-    max_year_value = int(df[year_col].fillna(2026).max())
+if "year" in df.columns:
+    min_year = int(df["year"].fillna(2000).min())
+    max_year = int(df["year"].fillna(2026).max())
 
     year_range = st.sidebar.slider(
         "Year",
-        min_value=min_year_value,
-        max_value=max_year_value,
-        value=(min_year_value, max_year_value)
+        min_value=min_year,
+        max_value=max_year,
+        value=(min_year, max_year)
     )
 else:
     year_range = (1900, 2100)
 
-if mileage_col:
-    max_mileage_value = int(df[mileage_col].fillna(300000).max())
+if "mileage_km" in df.columns:
+    min_mileage = int(df["mileage_km"].fillna(0).min())
+    max_mileage = int(df["mileage_km"].fillna(300000).max())
 
     mileage_range = st.sidebar.slider(
         "Mileage km",
         min_value=0,
-        max_value=max(1000, max_mileage_value),
-        value=(
-            int(df[mileage_col].fillna(0).min()),
-            max_mileage_value
-        )
+        max_value=max(1000, max_mileage),
+        value=(min_mileage, max_mileage)
     )
 else:
     mileage_range = (0, 999999)
 
-# New horsepower filter
-if horsepower_col:
-    df[horsepower_col] = pd.to_numeric(df[horsepower_col], errors="coerce")
-
-    min_hp_value = int(df[horsepower_col].fillna(0).min())
-    max_hp_value = int(df[horsepower_col].fillna(300).max())
+if "horsepower" in df.columns:
+    min_hp = int(df["horsepower"].fillna(0).min())
+    max_hp = int(df["horsepower"].fillna(300).max())
 
     horsepower_range = st.sidebar.slider(
-        "Horsepower hp",
+        "Horsepower",
         min_value=0,
-        max_value=max(50, max_hp_value),
-        value=(min_hp_value, max_hp_value)
+        max_value=max(50, max_hp),
+        value=(min_hp, max_hp)
     )
 else:
     horsepower_range = (0, 999999)
@@ -286,72 +330,65 @@ filtered_df = df.copy()
 
 if search_text:
     search_cols = [
-        "ai_car_name",
-        "ai_brand",
-        "ai_model",
-        "original_title",
-        "title",
-        "ai_short_reason",
-        "ai_location",
-        "original_location",
-        "detail_location",
-        "location"
+        "car_name",
+        "fuel",
+        "transmission",
+        "seller_type",
+        "location",
+        "raw_text",
     ]
 
-    existing_search_cols = [col for col in search_cols if col in filtered_df.columns]
+    existing_search_cols = [c for c in search_cols if c in filtered_df.columns]
 
-    if existing_search_cols:
-        mask = pd.Series(False, index=filtered_df.index)
+    mask = pd.Series(False, index=filtered_df.index)
 
-        for col in existing_search_cols:
-            mask = mask | filtered_df[col].fillna("").astype(str).str.contains(
-                search_text,
-                case=False,
-                na=False
-            )
+    for col in existing_search_cols:
+        mask = mask | filtered_df[col].fillna("").astype(str).str.contains(
+            search_text,
+            case=False,
+            na=False
+        )
 
-        filtered_df = filtered_df[mask]
+    filtered_df = filtered_df[mask]
 
-if selected_recommendations and recommendation_col:
+if selected_fuels and "fuel" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[recommendation_col].isin(selected_recommendations)
+        filtered_df["fuel"].astype(str).isin(selected_fuels)
     ]
 
-if selected_fuels and fuel_col:
+if selected_transmissions and "transmission" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[fuel_col].astype(str).isin(selected_fuels)
+        filtered_df["transmission"].astype(str).isin(selected_transmissions)
     ]
 
-if selected_seller_types and seller_type_col:
+if selected_sellers and "seller_type" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[seller_type_col].astype(str).isin(selected_seller_types)
+        filtered_df["seller_type"].astype(str).isin(selected_sellers)
     ]
 
-if score_col:
+if "recommendation_score" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[score_col].between(score_range[0], score_range[1])
+        filtered_df["recommendation_score"].between(score_range[0], score_range[1])
     ]
 
-if price_col:
+if "price_eur" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[price_col].between(price_range[0], price_range[1])
+        filtered_df["price_eur"].between(price_range[0], price_range[1])
     ]
 
-if year_col:
-    filtered_df[year_col] = pd.to_numeric(filtered_df[year_col], errors="coerce")
+if "year" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[year_col].between(year_range[0], year_range[1])
+        filtered_df["year"].between(year_range[0], year_range[1])
     ]
 
-if mileage_col:
+if "mileage_km" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[mileage_col].between(mileage_range[0], mileage_range[1])
+        filtered_df["mileage_km"].between(mileage_range[0], mileage_range[1])
     ]
 
-if horsepower_col:
-    filtered_df[horsepower_col] = pd.to_numeric(filtered_df[horsepower_col], errors="coerce")
+if "horsepower" in filtered_df.columns:
     filtered_df = filtered_df[
-        filtered_df[horsepower_col].between(horsepower_range[0], horsepower_range[1])
+        filtered_df["horsepower"].between(horsepower_range[0], horsepower_range[1])
     ]
 
 
@@ -362,162 +399,58 @@ col1, col2, col3, col4, col5, col6 = st.columns(6)
 
 col1.metric("Cars shown", len(filtered_df))
 
-if score_col and len(filtered_df) > 0:
-    col2.metric("Best score", int(filtered_df[score_col].max()))
+if "recommendation_score" in filtered_df.columns and len(filtered_df) > 0:
+    col2.metric("Best score", int(filtered_df["recommendation_score"].max()))
 else:
     col2.metric("Best score", "-")
 
-if price_col and len(filtered_df) > 0:
-    col3.metric("Lowest price", f"{int(filtered_df[price_col].min()):,} €")
+if "price_eur" in filtered_df.columns and len(filtered_df) > 0:
+    col3.metric("Lowest price", format_price(filtered_df["price_eur"].min()))
 else:
     col3.metric("Lowest price", "-")
 
-if year_col and len(filtered_df) > 0:
-    col4.metric("Newest year", int(filtered_df[year_col].max()))
+if "year" in filtered_df.columns and len(filtered_df) > 0:
+    col4.metric("Newest year", int(filtered_df["year"].max()))
 else:
     col4.metric("Newest year", "-")
 
-if mileage_col and len(filtered_df) > 0:
-    col5.metric("Lowest mileage", f"{int(filtered_df[mileage_col].min()):,} km")
+if "mileage_km" in filtered_df.columns and len(filtered_df) > 0:
+    col5.metric(
+        "Lowest mileage",
+        f"{format_number(filtered_df['mileage_km'].min())} km"
+    )
 else:
     col5.metric("Lowest mileage", "-")
 
-if horsepower_col and len(filtered_df) > 0:
-    col6.metric("Max horsepower", int(filtered_df[horsepower_col].max()))
+if "horsepower" in filtered_df.columns and len(filtered_df) > 0:
+    col6.metric("Max horsepower", int(filtered_df["horsepower"].max()))
 else:
     col6.metric("Max horsepower", "-")
 
 
 # -----------------------------
-# Default columns to display
-# -----------------------------
-default_columns = [
-    "ai_car_name",
-    "ai_total_score_0_to_100",
-    "ai_recommendation",
-    "ai_price_eur",
-
-    # Use original values where preferred
-    "original_year",
-    "ai_mileage_km",
-    "original_fuel",
-    "original_transmission",
-    "original_seller_type",
-
-    # AI extracted/evaluated values
-    "ai_location",
-    "ai_horsepower_hp",
-    "ai_doors",
-    "ai_critair",
-
-    # Scores
-    "ai_reliability_score_0_to_25",
-    "ai_buyer_suitability_score_0_to_20",
-    "ai_price_value_score_0_to_15",
-    "ai_zfe_critair_score_0_to_10",
-    "ai_running_cost_score_0_to_10",
-    "ai_resale_ease_score_1_to_5",
-    "ai_spare_parts_availability_score_1_to_10",
-
-    # Explanation
-    "ai_short_reason",
-    "ai_questions_to_ask_seller",
-
-    # URL last
-    "open_ad"
-]
-
-existing_default_columns = [
-    col for col in default_columns if col in filtered_df.columns
-]
-
-existing_default_columns = put_url_last(existing_default_columns)
-
-
-# -----------------------------
-# Column selector
-# -----------------------------
-with st.expander("Choose columns to display"):
-    selected_columns = st.multiselect(
-        "Columns",
-        filtered_df.columns.tolist(),
-        default=existing_default_columns,
-        format_func=display_name
-    )
-
-selected_columns = put_url_last(selected_columns)
-
-if not selected_columns:
-    selected_columns = existing_default_columns
-
-
-# -----------------------------
-# Main table
+# Ranked table
 # -----------------------------
 st.subheader("Ranked cars")
 
-display_df = filtered_df[selected_columns].copy()
-
-column_config = {}
-
-for col in display_df.columns:
-    column_config[col] = display_name(col)
-
-if "open_ad" in display_df.columns:
-    column_config["open_ad"] = st.column_config.LinkColumn(
-        "url",
-        display_text="Open ad"
-    )
-
-if "source_url" in display_df.columns:
-    column_config["source_url"] = st.column_config.LinkColumn(
-        "url",
-        display_text="Open ad"
-    )
-
-if "url" in display_df.columns:
-    column_config["url"] = st.column_config.LinkColumn(
-        "url",
-        display_text="Open ad"
-    )
-
-if score_col and score_col in display_df.columns:
-    column_config[score_col] = st.column_config.ProgressColumn(
-        "total_score_0_to_100",
-        min_value=0,
-        max_value=100
-    )
-
-if "ai_confidence_0_to_1" in display_df.columns:
-    column_config["ai_confidence_0_to_1"] = st.column_config.ProgressColumn(
-        "confidence_0_to_1",
-        min_value=0,
-        max_value=1
-    )
-
-st.dataframe(
-    display_df,
-    use_container_width=True,
-    height=650,
-    column_config=column_config
-)
+if len(filtered_df) == 0:
+    st.warning("No cars match your filters.")
+else:
+    html_table = build_html_table(filtered_df)
+    st.markdown(html_table, unsafe_allow_html=True)
 
 
 # -----------------------------
 # Download filtered CSV
-# With cleaned column names
 # -----------------------------
-download_df = filtered_df[selected_columns].copy()
-download_df = download_df.rename(
-    columns={col: display_name(col) for col in download_df.columns}
-)
+download_df = filtered_df.copy()
 
 csv_data = download_df.to_csv(index=False, encoding="utf-8-sig")
 
 st.download_button(
     label="Download filtered CSV",
     data=csv_data,
-    file_name="filtered_ranked_cars_clean_columns.csv",
+    file_name="filtered_ranked_cars.csv",
     mime="text/csv"
 )
 
@@ -528,67 +461,62 @@ st.download_button(
 st.subheader("Car detail viewer")
 
 if len(filtered_df) > 0:
-    if car_name_col:
-        car_names = filtered_df[car_name_col].fillna("Unknown car").astype(str)
-    else:
-        car_names = pd.Series(
-            filtered_df.index.astype(str),
-            index=filtered_df.index
-        )
+    car_names = filtered_df["car_name"].fillna("Unknown car").astype(str)
 
     selected_index = st.selectbox(
         "Select a car",
         options=filtered_df.index.tolist(),
         format_func=lambda i: (
             f"{car_names.loc[i]} | "
-            f"score: {filtered_df.loc[i].get(score_col, '-') if score_col else '-'}"
+            f"score: {format_score(filtered_df.loc[i].get('recommendation_score', '-'))}"
         )
     )
 
     car = filtered_df.loc[selected_index]
 
-    st.markdown(
-        f"### {car.get(car_name_col, 'Unknown car') if car_name_col else 'Unknown car'}"
-    )
+    car_title = car.get("car_name", "Unknown car")
+    car_url = car.get("url", None)
+
+    if pd.notna(car_url):
+        st.markdown(f"### [{car_title}]({car_url})")
+    else:
+        st.markdown(f"### {car_title}")
 
     c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 
-    c1.metric("Score", car.get(score_col, "-") if score_col else "-")
-    c2.metric("Recommendation", car.get(recommendation_col, "-") if recommendation_col else "-")
-    c3.metric("Price", f"{car.get(price_col, '-')} €" if price_col else "-")
-    c4.metric("Year", car.get(year_col, "-") if year_col else "-")
-    c5.metric("Mileage", f"{car.get(mileage_col, '-')} km" if mileage_col else "-")
-    c6.metric("Horsepower", car.get(horsepower_col, "-") if horsepower_col else "-")
-    c7.metric("Doors", car.get(doors_col, "-") if doors_col else "-")
+    c1.metric("Score", format_score(car.get("recommendation_score", "-")))
+    c2.metric("Price", format_price(car.get("price_eur", "-")))
+    c3.metric("Year", format_score(car.get("year", "-")))
+    c4.metric("Mileage", f"{format_number(car.get('mileage_km', '-'))} km")
+    c5.metric("Horsepower", format_score(car.get("horsepower", "-")))
+    c6.metric("Doors", format_score(car.get("doors", "-")))
+    c7.metric("Crit’Air", format_score(car.get("critair_estimated", "-")))
 
     st.write("**Fuel:**")
-    st.write(car.get(fuel_col, "-") if fuel_col else "-")
+    st.write(car.get("fuel", "-"))
 
     st.write("**Transmission:**")
-    st.write(car.get(transmission_col, "-") if transmission_col else "-")
+    st.write(car.get("transmission", "-"))
 
     st.write("**Seller type:**")
-    st.write(car.get(seller_type_col, "-") if seller_type_col else "-")
+    st.write(car.get("seller_type", "-"))
 
     st.write("**Location:**")
-    st.write(car.get(location_col, "-") if location_col else "-")
+    st.write(car.get("location", "-"))
 
-    st.write("**Reason:**")
-    st.write(car.get("ai_short_reason", ""))
+    if pd.notna(car_url):
+        st.link_button("Open Leboncoin ad", car_url)
 
-    st.write("**Known risks:**")
-    st.write(car.get("ai_known_risks", ""))
-
-    st.write("**Questions to ask seller:**")
-    st.write(car.get("ai_questions_to_ask_seller", ""))
-
-    url = car.get("source_url", car.get("url", car.get("original_url", None)))
-
-    if pd.notna(url):
-        st.link_button("Open Leboncoin ad", url)
-
-    with st.expander("Original description"):
-        st.write(car.get("original_detail_description", ""))
+    with st.expander("Score details"):
+        st.write(f"Price score: {format_score(car.get('price_score', '-'))}")
+        st.write(f"Horsepower score: {format_score(car.get('horsepower_score', '-'))}")
+        st.write(f"Year score: {format_score(car.get('year_score', '-'))}")
+        st.write(f"Mileage score: {format_score(car.get('mileage_score', '-'))}")
+        st.write(f"Location score: {format_score(car.get('location_score', '-'))}")
+        st.write(f"Seller score: {format_score(car.get('seller_score', '-'))}")
 
     with st.expander("Raw text"):
-        st.write(car.get("original_raw_text", ""))
+        st.write(car.get("raw_text", ""))
+
+    with st.expander("Screen-reader text"):
+        st.write(car.get("sr_text", ""))
